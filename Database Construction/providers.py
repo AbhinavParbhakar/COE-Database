@@ -1,18 +1,19 @@
 from pathlib import Path
 import pandas as pd
-from typing import Protocol, TypedDict
+from typing import Protocol, TypedDict, Self
 import tqdm
 from psycopg2 import connect, sql
+from psycopg2.extras import RealDictCursor
 from tables import Table
 
 
-class InformationProvider(Protocol):
+class BaseTypesProvider(Protocol):
     def return_information(self)->list[str]:...
 
-class InformationConfiguration(TypedDict):
-    information_table_name:str
-    information_label_name:str
-    information_provider:InformationProvider
+class BaseTypeConfiguration(TypedDict):
+    base_type_table_name:str
+    base_type_label_name:str
+    base_type_provider:BaseTypesProvider
 
 class BaseFolderValidator:
     def __init__(self,base_folder_path:Path,validation_extension:str) -> None:
@@ -145,7 +146,21 @@ class MovementsProvider:
     def return_information(self)->list[str]:
         return list(self.movements)
 
-class DatabaseConnection:
+class DatabaseConnection(Protocol):
+    def __enter__(self)->Self:...
+    
+    def __exit__(self, exc_type: str, exc_val: Exception, exc_tb)->None:...
+    
+    def is_existing_table(self,table_name:str)->bool:...
+    
+    def insert_new_information(self,table_name:str,label_name:str,value_name:str)->bool:...
+    
+    def create_table(self,query:sql.Composed)->bool:...
+    
+    def is_existing_attr_in_table(self, attr_name: str, attr_value: str, table_name: str)->bool:...
+    
+
+class PostgresDatabaseConnection:
     def __init__(self,connection_string:str) -> None:
         self.connection = connect(connection_string)
         self.cursor = self.connection.cursor()
@@ -153,7 +168,7 @@ class DatabaseConnection:
     
     def __enter__(self):
         self.context_manager_used = True
-        return self
+        return self 
     
     def __exit__(self, exc_type: str, exc_val: Exception, exc_tb)->None:
         if not exc_type:
@@ -182,12 +197,69 @@ class DatabaseConnection:
         self.connection.commit()
         return
     
+    def is_existing_table(self,table_name:str)->bool:
+        required_attribute = "table_name"
+        existing_tables_names : set[str] = set()
+        
+        query = sql.SQL("""
+                            SELECT {attribute} from information_schema.tables
+                            WHERE table_schema = 'public';
+                        """).format(attribute=sql.Identifier(required_attribute))
+        
+        self.cursor.execute(query)
+        
+        table_names = self.cursor.fetchall()
+        
+        if len(table_names) == 0:
+            return False
+        else:
+            existing_tables_names.update([table_name[0] for table_name in table_names])
+        
+        return table_name in existing_tables_names
+        
+    
     def create_table(self,query:sql.Composed)->bool:
         try:
             self.cursor.execute(query)
             return True
         except Exception as e:
             print(f'Exception occured when: {e}')
+            return False
+    
+    def is_existing_attr_in_table(self, attr_name: str, attr_value: str, table_name: str)->bool:
+        """ Checks if the given attribute name and value pair exist in the given table.
+        
+        ### Arguments
+        ``attr_name`` -- Column name to be checked
+        
+        ``attr_value`` -- Value to be searched against in the given column name
+        
+        ``table_name`` -- Name of the table to be checked
+        
+        ### External Effects
+        None
+        
+        ### Returns
+        ``True`` if the given key-value exists in the table
+        
+        ``False`` if key-value pair doesn't exist. 
+        
+        """
+        if not self.is_existing_table(table_name):
+            raise Exception(f'Table {table_name} does not exist.')
+        
+        query = sql.SQL("""SELECT {attr_name} FROM {table_name} WHERE {attr_name} = %s;""").format(
+                attr_name=sql.Identifier(attr_name),
+                table_name=sql.Identifier(table_name)
+            )
+        
+        self.cursor.execute(query,(attr_value))
+        
+        results = self.cursor.fetchall()
+        
+        if len(results) > 0:
+            return True
+        else:
             return False
 
 class DatabaseTableWriter:
@@ -198,25 +270,33 @@ class DatabaseTableWriter:
     def create_tables(self)->None:
         with self.connection:
             for table in self.tables:
-                is_success = self.connection.create_table(table.get_initialization_query())
+                is_success = True
+                if not self.connection.is_existing_table(table.get_table_name()):
+                    is_success = self.connection.create_table(table.get_initialization_query())
                 
                 if not is_success:
                     raise Exception(f'Table creation query failed for table {table.get_table_name()}')
 
-class DatabaseInformationWriter:
-    def __init__(self,database_connection:DatabaseConnection,providers_info:list[InformationConfiguration]) -> None:
+class DatabaseTypesWriter:
+    def __init__(self,database_connection:DatabaseConnection,providers_info:list[BaseTypeConfiguration]) -> None:
         self.db_connection = database_connection
         self.providers_info = providers_info
         
     def write_into_tables(self)->None:
         with self.db_connection:
             for provider_info in self.providers_info:
-                for value in provider_info['information_provider'].return_information():
-                    is_success = self.db_connection.insert_new_information(
-                        table_name = provider_info['information_table_name'],
-                        label_name = provider_info['information_label_name'],
-                        value_name = value
-                    )
+                for value in provider_info['base_type_provider'].return_information():
+                    is_success = True
+                    if not self.db_connection.is_existing_attr_in_table(
+                                attr_name=provider_info['base_type_label_name'],
+                                attr_value=value,
+                                table_name=provider_info['base_type_table_name']
+                            ):
+                                is_success = self.db_connection.insert_new_information(
+                                    table_name = provider_info['base_type_table_name'],
+                                    label_name = provider_info['base_type_label_name'],
+                                    value_name = value
+                                )
                     
                     if not is_success:
-                        raise Exception(f'[Failure] value not sucessfully written into {provider_info['information_table_name']}\n for label: {provider_info['information_label_name']}')
+                        raise Exception(f'[Failure] value not sucessfully written into {provider_info['base_type_table_name']}\n for label: {provider_info['base_type_label_name']}')
