@@ -1,8 +1,6 @@
-import tables
-from providers import MovementsProvider, VehiclesProvider, DirectionsProvider, BaseTypesProvider
-from providers import BaseFolderValidator
-from providers import BaseTypeConfiguration
-from providers import PostgresDatabaseConnection, DatabaseTableWriter, DatabaseTypesWriter
+import providers.tables_providers as tables
+from providers.types_providers import MovementsProvider, VehiclesProvider, DirectionsProvider, BaseTypesProvider, BaseFolderValidator, BaseTypeConfiguration
+from providers.database_providers import PostgresDatabaseConnection, DatabaseTableWriter, DatabaseTypesWriter
 from pathlib import Path
 from dataclasses import dataclass
 import dotenv
@@ -23,6 +21,7 @@ class ApplicationConfiguration:
     miovision_base_folder_name : str
     vehicle_class_total_volume_sheet_name : str
     validation_extension : str
+    intitialize_setup : bool
     
 
 class App:
@@ -70,11 +69,11 @@ class App:
         ``None``
         
         """
-        directions = DirectionsProvider(base_validator)
+        directions : BaseTypesProvider = DirectionsProvider(base_validator)
         
-        movements = MovementsProvider(base_validator,directions)
+        movements : BaseTypesProvider = MovementsProvider(base_validator,directions)
         
-        vehicles = VehiclesProvider(base_validator,self.app_configuration.vehicle_class_total_volume_sheet_name)
+        vehicles : BaseTypesProvider = VehiclesProvider(base_validator,self.app_configuration.vehicle_class_total_volume_sheet_name)
         
         directions_configuration = BaseTypeConfiguration(
                                     base_type_label_name=tables.PredefinedTableLabels.direction_types.value,
@@ -84,7 +83,7 @@ class App:
         
         movements_configuration = BaseTypeConfiguration(
                                     base_type_label_name=tables.PredefinedTableLabels.movement_types.value,
-                                    base_type_table_name=tables.PredefinedTableNames.direction_types.value,
+                                    base_type_table_name=tables.PredefinedTableNames.movement_types.value,
                                     base_type_provider=movements
                                     )
         
@@ -140,20 +139,22 @@ class App:
         ``None``
         
         """
-        self._initialize_database()
-        self._intialize_providers(BaseFolderValidator(
-                                    base_folder_path=Path(app_configuration.miovision_base_folder_name),
-                                    validation_extension=app_configuration.validation_extension
-                                ))
+        if self.app_configuration.intitialize_setup:
+            self._initialize_database()
+            self._intialize_providers(BaseFolderValidator(
+                                        base_folder_path=Path(app_configuration.miovision_base_folder_name),
+                                        validation_extension=app_configuration.validation_extension
+                                    ))
         
     
 if __name__ == "__main__":
     
     app_configuration = ApplicationConfiguration(
                             db_connection_string = get_connection_string('LOCAL_DATABASE_URL'),
-                            miovision_base_folder_name= 'Granular Miovision Files',
+                            miovision_base_folder_name = 'Granular Miovision Files',
                             vehicle_class_total_volume_sheet_name = 'Total Volume Class Breakdown',
-                            validation_extension='.xlsx'
+                            validation_extension = '.xlsx',
+                            intitialize_setup = True
                         )
     
     application = App(app_configuration=app_configuration)

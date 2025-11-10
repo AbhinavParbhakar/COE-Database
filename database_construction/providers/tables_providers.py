@@ -48,7 +48,7 @@ class StudiesTable:
 
 class StudiesDirectionsTable:
     def __init__(self,) -> None:
-        self.table_name = PredefinedTableNames.studies_directions
+        self.table_name = PredefinedTableNames.studies_directions.value
         self.query = SQL("""CREATE TABLE {table_name}(
                        id INTEGER GENERATED ALWAYS AS IDENTITY,
                        miovision_id INTEGER,
@@ -99,7 +99,7 @@ class MovementTypesTable:
         self.query = SQL("""
                    CREATE TABLE {movement_types}(
                        id INTEGER GENERATED ALWAYS AS IDENTITY,
-                       {movement_label} VARCHAR(10) NOT NULL,
+                       {movement_label} VARCHAR(40) NOT NULL,
                        PRIMARY KEY(id)
                    );
         """).format(
@@ -115,7 +115,7 @@ class MovementTypesTable:
 
 class VehicleTypesTable:
     def __init__(self,) -> None:
-        self.table_name = PredefinedTableNames.vehicles_types
+        self.table_name = PredefinedTableNames.vehicles_types.value
         self.query = SQL("""
                        CREATE TABLE {vehicle_types}(
                        id INTEGER GENERATED ALWAYS AS IDENTITY,
