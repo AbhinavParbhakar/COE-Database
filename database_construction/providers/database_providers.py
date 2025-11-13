@@ -1,4 +1,4 @@
-from typing import Protocol, Self
+from typing import Protocol, Self, Any
 from psycopg2 import connect, sql
 from .tables_providers import Table
 from .types_providers import BaseTypeConfiguration
@@ -7,10 +7,12 @@ class DatabaseConnection(Protocol):
     def __enter__(self)->Self:...
     
     def __exit__(self, exc_type: str, exc_val: Exception, exc_tb)->None:...
+
+    def select_existing_attributes(self, table_name : str, query_attr : list[str], where_clause : bool, where_labels : list[str], where_values : list[str])
     
     def is_existing_table(self,table_name:str)->bool:...
     
-    def insert_new_information(self,table_name:str,labels:list[str],values:list[str])->bool:...
+    def insert_new_information(self,table_name:str,labels:list[str],values:list[Any])->bool:...
     
     def create_table(self,query:sql.Composed)->bool:...
     
@@ -35,7 +37,7 @@ class PostgresDatabaseConnection:
             raise Exception(f'Error occured: {exc_val}')
         
     
-    def insert_new_information(self,table_name:str,labels:list[str],values:list[str])->bool:
+    def insert_new_information(self,table_name:str,labels:list[str],values:list[Any])->bool:
         try:
             query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
                 sql.Identifier(table_name),
@@ -161,5 +163,5 @@ class DatabaseTypesWriter:
 
 class DatabaseCoreWriter:
     """ Class used to populate columns for non-base-type tables, hosting core DB data. """
-    def __init__(self, db_connection: DatabaseConnection, ) -> None:
+    def __init__(self, db_connection: DatabaseConnection, base_validator : Base) -> None:
         pass

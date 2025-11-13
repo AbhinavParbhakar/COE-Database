@@ -1,25 +1,36 @@
 from typing import Protocol, TypedDict
 from psycopg2.sql import SQL, Identifier, Composed
-from enum import Enum
+from enum import StrEnum, auto
 
 class Table(Protocol):
     def get_initialization_query(self)->Composed:...
     def get_table_name(self)->str:...
 
-class PredefinedTableNames(str, Enum):
-    studies = 'studies'
-    studies_directions = 'studies_directions'
-    directions_movements = 'direction_movements'
-    movements_vehicles = 'movements_vehicles'
-    granular_count = 'granular_count'
-    vehicles_types = 'vehicles_types'
-    movement_types = 'movement_types'
-    direction_types = 'direction_types'
+class PredefinedTableNames(StrEnum):
+    studies = auto()
+    studies_directions = auto()
+    directions_movements = auto()
+    movements_vehicles = auto()
+    granular_count = auto()
+    vehicles_types = auto()
+    movement_types = auto()
+    direction_types = auto()
     
-class PredefinedTableLabels(str, Enum):
+class PredefinedTableLabels(StrEnum):
     vehicles_types = "vehicle_type_name"
     movement_types = "movement_type_name"
     direction_types = "direction_type_name"
+
+class StudiesTableColumns(StrEnum):
+    miovision_id = auto()
+    study_name = auto()
+    study_duration = auto()
+    study_type = auto()
+    location_name = auto()
+    latitude = auto()
+    longitude = auto()
+    project_name = auto()
+    study_date = auto()
 
 
 class StudiesTable:
