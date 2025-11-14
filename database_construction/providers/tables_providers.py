@@ -32,24 +32,51 @@ class StudiesTableColumns(StrEnum):
     project_name = auto()
     study_date = auto()
 
+class StudiesDirectionsTableColumns(StrEnum):
+    miovision_id = auto()
+    direction_type_id = auto()
+
+class MovementsDirectionsTableColumns(StrEnum):
+    study_direction_id = auto()
+    movement_type_id = auto()
+
+class MovementVehiclesTableColumns(StrEnum):
+    direction_movement_id = auto()
+    vehicle_type_id = auto()
+    
+class GranularCountsTableColumns(StrEnum):
+    movement_vehicle_id = auto()
+    time_stamp = auto()
+    traffic_count = auto()
 
 class StudiesTable:
     def __init__(self) -> None:
         self.table_name = PredefinedTableNames.studies.value
         self.query = SQL("""
                    CREATE TABLE {table_name}(
-                       miovision_id INTEGER,
-                       study_name VARCHAR(100) NOT NULL,
-                       study_duration DECIMAL NOT NULL,
-                       study_type VARCHAR(100) NOT NULL,
-                       location_name VARCHAR(100) NOT NULL,
-                       latitude DECIMAL NOT NULL,
-                       longitude DECIMAL NOT NULL,
-                       project_name VARCHAR(100),
-                       study_date DATE NOT NULL,
-                       PRIMARY KEY(miovision_id)
+                       {miovision_id} INTEGER,
+                       {study_name} VARCHAR(100) NOT NULL,
+                       {study_duration} DECIMAL NOT NULL,
+                       {study_type} VARCHAR(100) NOT NULL,
+                       {location_name} VARCHAR(100) NOT NULL,
+                       {latitude} DECIMAL NOT NULL,
+                       {longitude} DECIMAL NOT NULL,
+                       {project_name} VARCHAR(100),
+                       {study_date} DATE NOT NULL,
+                       PRIMARY KEY({miovision_id})
                    );
-                   """).format(table_name=Identifier(self.table_name))
+                   """).format(
+                        table_name=Identifier(self.table_name),
+                        miovision_id=Identifier(StudiesTableColumns.miovision_id.value),
+                        study_name=Identifier(StudiesTableColumns.study_name.value),
+                        study_duration=Identifier(StudiesTableColumns.study_duration.value),
+                        study_type=Identifier(StudiesTableColumns.study_type.value),
+                        location_name=Identifier(StudiesTableColumns.location_name.value),
+                        latitude=Identifier(StudiesTableColumns.latitude.value),
+                        longitude=Identifier(StudiesTableColumns.longitude.value),
+                        project_name=Identifier(StudiesTableColumns.project_name.value),
+                        study_date=Identifier(StudiesTableColumns.study_date.value)
+                       )
     
     def get_table_name(self)->str:
         return self.table_name
@@ -62,19 +89,22 @@ class StudiesDirectionsTable:
         self.table_name = PredefinedTableNames.studies_directions.value
         self.query = SQL("""CREATE TABLE {table_name}(
                        id INTEGER GENERATED ALWAYS AS IDENTITY,
-                       miovision_id INTEGER,
-                       direction_type_id INTEGER,
+                       {miovision_id} INTEGER,
+                       {direction_type_id} INTEGER,
                        PRIMARY KEY(id),
                        CONSTRAINT fk_studies
-                       FOREIGN KEY(miovision_id)
-                       REFERENCES {studies_table}(miovision_id),
+                       FOREIGN KEY({miovision_id})
+                       REFERENCES {studies_table}({studies_miovision_id}),
                        CONSTRAINT fk_direction_types
-                       FOREIGN KEY(direction_type_id)
+                       FOREIGN KEY({direction_type_id})
                        REFERENCES {direction_types}(id)
                    );
                    """).format(
                        table_name=Identifier(self.table_name),
+                       miovision_id=Identifier(StudiesDirectionsTableColumns.miovision_id.value),
+                       direction_type_id=Identifier(StudiesDirectionsTableColumns.direction_type_id.value),
                        studies_table=Identifier(PredefinedTableNames.studies.value),
+                       studies_miovision_id=Identifier(StudiesTableColumns.miovision_id.value),
                        direction_types=Identifier(PredefinedTableNames.direction_types.value)
                    )
     
@@ -150,18 +180,20 @@ class DirectionsMovementsTable:
         self.query = SQL("""
                        CREATE TABLE {directions_movements}(
                        id INTEGER GENERATED ALWAYS AS IDENTITY,
-                       study_direction_id INTEGER,
-                       movement_type_id INTEGER,
+                       {study_direction_id} INTEGER,
+                       {movement_type_id} INTEGER,
                        PRIMARY KEY(id),
                        CONSTRAINT fk_studies_directions
-                       FOREIGN KEY(study_direction_id)
+                       FOREIGN KEY({study_direction_id})
                        REFERENCES {studies_directions}(id),
                        CONSTRAINT fk_movement_type
-                       FOREIGN KEY(movement_type_id)
+                       FOREIGN KEY({movement_type_id})
                        REFERENCES {movement_types}(id)
                    );
         """).format(
             directions_movements=Identifier(self.table_name),
+            study_direction_id=Identifier(MovementsDirectionsTableColumns.study_direction_id.value),
+            movement_type_id=Identifier(MovementsDirectionsTableColumns.movement_type_id.value),
             studies_directions=Identifier(PredefinedTableNames.studies_directions.value),
             movement_types=Identifier(PredefinedTableNames.movement_types.value)
         )
@@ -178,18 +210,20 @@ class MovementVehiclesTable:
         self.query = SQL("""
                        CREATE TABLE {movement_vehicle_classes}(
                        id INTEGER GENERATED ALWAYS AS IDENTITY,
-                       direction_movement_id INTEGER,
-                       vehicle_type_id INTEGER,
+                       {direction_movement_id} INTEGER,
+                       {vehicle_type_id} INTEGER,
                        PRIMARY KEY(id),
                        CONSTRAINT fk_direction_movement
-                       FOREIGN KEY(direction_movement_id)
+                       FOREIGN KEY({direction_movement_id})
                        REFERENCES {directions_movements}(id),
                        CONSTRAINT fk_vehicle_types
-                       FOREIGN KEY(vehicle_type_id)
+                       FOREIGN KEY({vehicle_type_id})
                        REFERENCES {vehicle_types}(id)
                    );
         """).format(
             movement_vehicle_classes=Identifier(self.table_name),
+            direction_movement_id=Identifier(MovementVehiclesTableColumns.direction_movement_id.value),
+            vehicle_type_id=Identifier(MovementVehiclesTableColumns.vehicle_type_id.value),
             directions_movements=Identifier(PredefinedTableNames.directions_movements.value),
             vehicle_types=Identifier(PredefinedTableNames.vehicles_types.value)
         )
@@ -206,16 +240,21 @@ class GranularCountTable:
         self.query = SQL("""
             CREATE TABLE {granular_count}(
                 id INTEGER GENERATED ALWAYS AS IDENTITY,
-                movement_vehicle_id INTEGER,
-                time_stamp TIME NOT NULL,
+                {movement_vehicle_id} INTEGER,
+                {time_stamp} TIME NOT NULL,
+                {traffic_count} INTEGER NOT NULL,
                 PRIMARY KEY(id),
                 CONSTRAINT fk_movement_vehicle
-                FOREIGN KEY(movement_vehicle_id)
+                FOREIGN KEY({movement_vehicle_id})
                 REFERENCES {movement_vehicle_classes}(id)
             );
-        """).format(granular_count=Identifier(self.table_name), 
-                    movement_vehicle_classes=Identifier(PredefinedTableNames.movements_vehicles.value)
-                    )
+        """).format(
+            granular_count=Identifier(self.table_name),
+            movement_vehicle_id=Identifier(GranularCountsTableColumns.movement_vehicle_id.value),
+            time_stamp=Identifier(GranularCountsTableColumns.time_stamp.value),
+            traffic_count=Identifier(GranularCountsTableColumns.traffic_count.value),
+            movement_vehicle_classes=Identifier(PredefinedTableNames.movements_vehicles.value)
+        )
         
     def get_table_name(self)->str:
         return self.table_name

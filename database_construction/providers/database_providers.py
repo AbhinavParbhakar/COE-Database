@@ -1,14 +1,17 @@
-from typing import Protocol, Self, Any
+from typing import Protocol, Self, Any, TypeVar
 from psycopg2 import connect, sql
 from .tables_providers import Table
+import datetime
+from datetime import _Date
 from .types_providers import BaseTypeConfiguration
+
 
 class DatabaseConnection(Protocol):
     def __enter__(self)->Self:...
     
     def __exit__(self, exc_type: str, exc_val: Exception, exc_tb)->None:...
 
-    def select_existing_attributes(self, table_name : str, query_attr : list[str], where_clause : bool, where_labels : list[str], where_values : list[str])
+    def select_existing_attributes(self, table_name : str, query_attr : list[str], where_labels : list[str] | None = None, where_values : list[Any] | None = None)->list[tuple]:...
     
     def is_existing_table(self,table_name:str)->bool:...
     
@@ -121,6 +124,31 @@ class PostgresDatabaseConnection:
             return True
         else:
             return False
+    
+    def select_existing_attributes(self, table_name : str, query_attr : list[str],where_labels : list[str] | None = None, where_values : list[Any] | None = None)->list[tuple]:
+        if where_labels is not None and where_values is not None:
+            if len(where_labels) != len(where_values):
+                raise Exception("len() of where_labels must equal that of where_values.")
+            
+            query = sql.SQL("SELECT {} FROM {} WHERE {}").format(
+                sql.SQL(', ').join(map(sql.Identifier,query_attr)),
+                sql.Identifier(table_name),
+                sql.SQL(' AND ').join([
+                    sql.SQL('{} = %s').format(sql.Identifier(label))  
+                    for label in where_labels
+                    ])
+            )
+            
+            self.cursor.execute(query,where_values)
+        else:
+            query = sql.SQL("SELECT {} FROM {}").format(
+                sql.SQL(', ').join(map(sql.Identifier,query_attr)),
+                sql.Identifier(table_name)
+            )
+            
+            self.cursor.execute(query,where_values)
+            
+        return self.cursor.fetchall()
 
 class DatabaseTableWriter:
     def __init__(self,database_connection:DatabaseConnection,tables:list[Table]) -> None:
@@ -161,7 +189,34 @@ class DatabaseTypesWriter:
                     if not is_success:
                         raise Exception(f'[Failure] value: {value} not sucessfully written into {provider_info['base_type_table_name']}\n for label: {provider_info['base_type_label_name']}')
 
-class DatabaseCoreWriter:
-    """ Class used to populate columns for non-base-type tables, hosting core DB data. """
-    def __init__(self, db_connection: DatabaseConnection, base_validator : Base) -> None:
-        pass
+
+class DatabaseUpdater:
+    def __init__(self, db_connection: DatabaseConnection) -> None:
+        self._db_connection = db_connection
+    
+    def update_db_and_return_id(self,table_name : str, labels : list[str], values : list[Any])->int|str:
+        self._db_connection.insert_new_information(
+            table_name=table_name,
+            labels=labels,
+            values=values
+        )
+        
+        query_results = self._db_connection.select_existing_attributes(
+            table_name=table_name,
+            query_attr=['id'],
+            where_labels=labels,
+            where_values=values
+        )
+        
+        if len(query_results) != 1:
+            raise Exception(f'Non-singular result returned for ID when looking for {values}')
+        
+        return query_results[0][0]
+    
+    def update_db(self,table_name : str, labels : list[str], values : list[Any])->None:
+        self._db_connection.insert_new_information(
+            table_name=table_name,
+            labels=labels,
+            values=values
+        )
+        

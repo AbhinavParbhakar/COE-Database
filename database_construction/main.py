@@ -55,7 +55,7 @@ class App:
         
         return
     
-    def _intialize_providers(self, base_validator: BaseFolderValidator)->None:
+    def _intialize_base_providers(self, base_validator: BaseFolderValidator)->None:
         """Creates a list of ``BaseTypesProvider`` objects and uses ``DatabaseTypesWriter`` to write these
         objects into the database. Assigns the database types writer to ``self``.
         
@@ -141,7 +141,7 @@ class App:
         """
         if self.app_configuration.intitialize_setup:
             self._initialize_database()
-            self._intialize_providers(BaseFolderValidator(
+            self._intialize_base_providers(BaseFolderValidator(
                                         base_folder_path=Path(app_configuration.miovision_base_folder_name),
                                         validation_extension=app_configuration.validation_extension
                                     ))
