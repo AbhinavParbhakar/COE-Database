@@ -1,9 +1,8 @@
-from typing import Protocol, Self, Any, TypeVar
+from typing import Protocol, Self, Any
 from psycopg2 import connect, sql
 from .tables_providers import Table
-import datetime
-from datetime import _Date
 from .types_providers import BaseTypeConfiguration
+import tqdm
 
 
 class DatabaseConnection(Protocol):
@@ -157,7 +156,8 @@ class DatabaseTableWriter:
     
     def create_tables(self)->None:
         with self.connection:
-            for table in self.tables:
+            print("Initializing tables")
+            for table in tqdm.tqdm(self.tables):
                 is_success = True
                 if not self.connection.is_existing_table(table.get_table_name()):
                     is_success = self.connection.create_table(table.get_initialization_query())
@@ -173,6 +173,7 @@ class DatabaseTypesWriter:
     def write_into_tables(self)->None:
         with self.db_connection:
             for provider_info in self.providers_info:
+                print(f'Processing {provider_info["base_type_table_name"]} initialization.')
                 for value in provider_info['base_type_provider'].return_information():
                     is_success = True
                     if not self.db_connection.is_existing_attr_in_table(
@@ -193,13 +194,15 @@ class DatabaseTypesWriter:
 class DatabaseUpdater:
     def __init__(self, db_connection: DatabaseConnection) -> None:
         self._db_connection = db_connection
-    
+        
     def update_db_and_return_id(self,table_name : str, labels : list[str], values : list[Any])->int|str:
-        self._db_connection.insert_new_information(
-            table_name=table_name,
-            labels=labels,
-            values=values
-        )
+        
+        with self._db_connection as connection:
+            connection.insert_new_information(
+                table_name=table_name,
+                labels=labels,
+                values=values
+            )
         
         query_results = self._db_connection.select_existing_attributes(
             table_name=table_name,
@@ -214,9 +217,10 @@ class DatabaseUpdater:
         return query_results[0][0]
     
     def update_db(self,table_name : str, labels : list[str], values : list[Any])->None:
-        self._db_connection.insert_new_information(
-            table_name=table_name,
-            labels=labels,
-            values=values
-        )
+        with self._db_connection as connection:
+            connection.insert_new_information(
+                table_name=table_name,
+                labels=labels,
+                values=values
+            )
         

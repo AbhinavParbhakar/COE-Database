@@ -4,6 +4,7 @@ from .tables_providers import PredefinedTableNames, StudiesTableColumns, Studies
 from .tables_providers import GranularCountsTableColumns, MovementVehiclesTableColumns
 from .database_providers import DatabaseConnection, DatabaseUpdater
 from .extraction_providers import StudiesExtractor, DirectionsExtractor, MovementsExtractor, GranularExtractor
+import tqdm
 
 
 class TransactionContext:
@@ -97,7 +98,7 @@ class TransactionContext:
     def update_path_movements_mapping(self, path: str, movement: str)->None:
         if path not in self._path_movements_mapping:
             self._path_movements_mapping[path] = set()
-        self._path_movements_mapping [path].update(movement)
+        self._path_movements_mapping[path].update([movement])
     
     def get_path_movements(self, path: str)->list[str]:
         if path not in self._path_movements_mapping:
@@ -121,7 +122,7 @@ class TransactionContext:
         if path not in self._path_directions_mapping:
             self._path_directions_mapping[path] = set()
         
-        self._path_directions_mapping[path].update(direction)
+        self._path_directions_mapping[path].update([direction])
         
     def get_path_directions(self, path:str)->list[str]:
         if path not in self._path_directions_mapping:
@@ -151,7 +152,8 @@ class StudiesDirectionsProvider:
         self._extractor = directions_extractor
     
     def write_data(self)->None:
-        for path in self._paths:
+        print(f"Populating {PredefinedTableNames.studies_directions.value}")
+        for path in tqdm.tqdm(self._paths):
             directions = self._extractor.extract_fields(path=path)
             for direction in directions:
                 id = self._db_connection.update_db_and_return_id(
@@ -176,8 +178,9 @@ class DirectionsMovementsProvider:
         self._extractor = extractor
         self._context = context
     
-    def write_date(self)->None:
-        for path in self._paths:
+    def write_data(self)->None:
+        print(f"Populating {PredefinedTableNames.directions_movements.value}")
+        for path in tqdm.tqdm(self._paths):
             extracted_data = self._extractor.extract_fields(
                 path,
                 self._context.get_path_directions(str(path))
@@ -185,7 +188,7 @@ class DirectionsMovementsProvider:
             
             for direction_movement in extracted_data:
                 id = self._db_connection.update_db_and_return_id(
-                    table_name=PredefinedTableNames.directions_movements,
+                    table_name=PredefinedTableNames.directions_movements.value,
                     labels=[
                         MovementsDirectionsTableColumns.movement_type_id.value,
                         MovementsDirectionsTableColumns.study_direction_id.value
@@ -211,7 +214,8 @@ class VehiclesAndGranularCountsProvider:
         self._extractor = extractor
     
     def write_data(self)->None:
-        for path in self._paths:
+        print(f"Populating {PredefinedTableNames.movements_vehicles.value} and {PredefinedTableNames.granular_count.value}.")
+        for path in tqdm.tqdm(self._paths):
             vehicle_granular_counts = self._extractor.extract_fields(
                 path=path,
                 directions=self._context.get_path_directions(path=str(path)),
@@ -229,10 +233,10 @@ class VehiclesAndGranularCountsProvider:
                     )
                 except:
                     movement_vehicle_id = self._db_connection.update_db_and_return_id(
-                        table_name=PredefinedTableNames.movements_vehicles,
+                        table_name=PredefinedTableNames.movements_vehicles.value,
                         labels=[
-                            MovementVehiclesTableColumns.direction_movement_id,
-                            MovementVehiclesTableColumns.vehicle_type_id
+                            MovementVehiclesTableColumns.direction_movement_id.value,
+                            MovementVehiclesTableColumns.vehicle_type_id.value
                         ],
                         values=[
                             self._context.get_direction_movement_id(miovision_id=vehicle_granular_count.miovision_id,
@@ -248,7 +252,7 @@ class VehiclesAndGranularCountsProvider:
                                                                 id=int(movement_vehicle_id))
                     
                 self._db_connection.update_db(
-                        table_name=PredefinedTableNames.granular_count,
+                        table_name=PredefinedTableNames.granular_count.value,
                         labels=[
                             GranularCountsTableColumns.movement_vehicle_id.value,
                             GranularCountsTableColumns.time_stamp.value,
@@ -268,30 +272,32 @@ class StudiesProvider:
         self._studies_extractor = studies_extractor
     
     def write_data(self)->None:
-        for path in self._paths:
-            study_fields = self._studies_extractor.extract_fields(path)
-            self._db_connection.insert_new_information(
-                table_name=PredefinedTableNames.studies.value,
-                labels=[
-                    StudiesTableColumns.miovision_id.value,
-                    StudiesTableColumns.latitude.value,
-                    StudiesTableColumns.longitude.value,
-                    StudiesTableColumns.location_name.value,
-                    StudiesTableColumns.project_name.value,
-                    StudiesTableColumns.study_date.value,
-                    StudiesTableColumns.study_duration.value,
-                    StudiesTableColumns.study_type.value,
-                    StudiesTableColumns.study_name.value
-                ],
-                values=[
-                    study_fields.miovision_id,
-                    study_fields.latitude,
-                    study_fields.longitude,
-                    study_fields.location_name,
-                    study_fields.project_name,
-                    study_fields.study_date.date(),
-                    study_fields.study_duration,
-                    study_fields.study_type,
-                    study_fields.study_name
-                ]
-            )
+        print(f"Populating {PredefinedTableNames.studies.value}")
+        with self._db_connection as connection:
+            for path in tqdm.tqdm(self._paths):
+                study_fields = self._studies_extractor.extract_fields(path)
+                connection.insert_new_information(
+                    table_name=PredefinedTableNames.studies.value,
+                    labels=[
+                        StudiesTableColumns.miovision_id.value,
+                        StudiesTableColumns.latitude.value,
+                        StudiesTableColumns.longitude.value,
+                        StudiesTableColumns.location_name.value,
+                        StudiesTableColumns.project_name.value,
+                        StudiesTableColumns.study_date.value,
+                        StudiesTableColumns.study_duration.value,
+                        StudiesTableColumns.study_type.value,
+                        StudiesTableColumns.study_name.value
+                    ],
+                    values=[
+                        study_fields.miovision_id,
+                        study_fields.latitude,
+                        study_fields.longitude,
+                        study_fields.location_name,
+                        study_fields.project_name,
+                        study_fields.study_date.date(),
+                        study_fields.study_duration,
+                        study_fields.study_type,
+                        study_fields.study_name
+                    ]
+                )

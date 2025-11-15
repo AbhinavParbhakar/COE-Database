@@ -18,16 +18,14 @@ class StudiesFields:
 
 class MiovisionExtractor:
     @staticmethod
-    def get_study_type(file_path:str)->str:
-        excel_name_with_file_extension = file_path.split('/')[-1]
-        excel_name = excel_name_with_file_extension.split('.')[0]
+    def get_study_type(file_path:Path)->str:
+        excel_name = file_path.stem
         study_type, miovision_id_string = excel_name.split('-')
         return study_type
 
     @staticmethod
-    def get_miovision_id_string(file_path:str)->str:
-        excel_name_with_file_extension = file_path.split('/')[-1]
-        excel_name = excel_name_with_file_extension.split('.')[0]
+    def get_miovision_id_string(file_path:Path)->str:
+        excel_name = file_path.stem
         study_type, miovision_id_string = excel_name.split('-')
         return miovision_id_string
 
@@ -68,8 +66,8 @@ class StudiesExtractor:
             values_column = summary_df.columns[1]
             
             # Get the study type and miovision id
-            study_type = MiovisionExtractor.get_study_type(str(path))
-            miovision_id_string = MiovisionExtractor.get_miovision_id_string(str(path))
+            study_type = MiovisionExtractor.get_study_type(path)
+            miovision_id_string = MiovisionExtractor.get_miovision_id_string(path)
             miovision_id = int(miovision_id_string)
             
             # Get the relevant indices
@@ -117,7 +115,7 @@ class DirectionsExtractor:
     def extract_fields(self, path : Path) -> list[StudiesDirectionsFields]:
         direction_type_indicator = 'bound'
         direction_names : list[StudiesDirectionsFields] = []
-        miovision_id_string = MiovisionExtractor.get_miovision_id_string(str(path))
+        miovision_id_string = MiovisionExtractor.get_miovision_id_string(path)
         
         df = pd.read_excel(path,sheet_name=None)
         sheet_names = list(df.keys())
@@ -151,7 +149,7 @@ class MovementsExtractor:
     def extract_fields(self, path : Path, directions: list[str]) -> list[DirectionsMovementsFields]:
         movements : list[DirectionsMovementsFields] = []
         directions_set = {direction for direction in directions}
-        miovision_id_string = MiovisionExtractor.get_miovision_id_string(str(path))
+        miovision_id_string = MiovisionExtractor.get_miovision_id_string(path)
         omit_names = ['Movement','Unnamed']
         direction_sheets = pd.read_excel(path,sheet_name=None,skiprows=1)
         
@@ -182,7 +180,7 @@ class GranularExtractor:
         directions_sets = {direction for direction in directions}
         movements_sets = {movement for movement in movements}
         vehicles_sets = {vehicle for vehicle in vehicles}
-        miovision_id_string = MiovisionExtractor.get_miovision_id_string(str(path))
+        miovision_id_string = MiovisionExtractor.get_miovision_id_string(path)
         granular_counts : list[GranularFields] = []
         direction_sheets = pd.read_excel(io=Path,sheet_name=None,skiprows=1,index_col=0)
         vehicle_index = 0
