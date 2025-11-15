@@ -182,7 +182,7 @@ class GranularExtractor:
         vehicles_sets = {vehicle for vehicle in vehicles}
         miovision_id_string = MiovisionExtractor.get_miovision_id_string(path)
         granular_counts : list[GranularFields] = []
-        direction_sheets = pd.read_excel(io=Path,sheet_name=None,skiprows=1,index_col=0)
+        direction_sheets = pd.read_excel(io=path,sheet_name=None,skiprows=1,index_col=0)
         vehicle_index = 0
         
         for sheet_name, directional_df in direction_sheets.items():

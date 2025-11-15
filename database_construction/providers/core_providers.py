@@ -260,7 +260,7 @@ class VehiclesAndGranularCountsProvider:
                         ],
                         values=[
                             movement_vehicle_id,
-                            vehicle_granular_count.time.time,
+                            vehicle_granular_count.time.time(),
                             vehicle_granular_count.traffic_count
                         ]
                     )
