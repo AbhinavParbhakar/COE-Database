@@ -1,10 +1,14 @@
-from typing import Protocol
-from playwright.sync_api import sync_playwright
-from playwright.sync_api import Playwright, Page
+from typing import Protocol, TypedDict
+from playwright.sync_api import sync_playwright, Locator
 from enum import StrEnum
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+
+class DirectionalVolumeAttr(TypedDict):
+    total_volume : int
+    in_volume : int
+    out_volume : int
 
 class AuthenticationStorageConfig(StrEnum):
     path_name = 'auth.json'
@@ -17,7 +21,9 @@ class AuthenticationScrapingConfig(StrEnum):
     auth_url = "https://datalink.miovision.com/"
 
 class VolumeScrapingConfig(StrEnum):
-    volume_locator_text = 'text.direction_total'
+    total_volume_locator_text = 'text.direction_total'
+    in_volume_locator_text = 'text.enter_total'
+    out_volume_locator_text = 'text.exit_total'
     volume_direction_id_name = 'data-direction'
     
 class LocalCredentials(StrEnum):
@@ -28,6 +34,15 @@ class CredentialsProvider(Protocol):
     def get_username(self)->str:...
     
     def get_password(self)->str:...
+
+class VolumeProvider(Protocol):
+    def get_volume(self,miovision_id:str)->dict[str,DirectionalVolumeAttr]:...
+
+class VolumeScraper(Protocol):
+    def return_directions_volumes(self,url:str)->list[tuple[str,DirectionalVolumeAttr]]:...
+
+class Authenticator(Protocol):
+    def return_authentication_file(self)->Path:...
 
 class LocalCredentialsProvider:
     def __init__(self) -> None:
@@ -42,15 +57,6 @@ class LocalCredentialsProvider:
 
     def get_password(self)->str:
         return os.environ[LocalCredentials.password.value]
-    
-class VolumeProvider(Protocol):
-    def get_volume(self,miovision_id:str)->dict[str,int]:...
-
-class VolumeScraper(Protocol):
-    def return_directions_volumes(self,url:str)->tuple[list[str],list[int]]:...
-
-class Authenticator(Protocol):
-    def return_authentication_file(self)->Path:...
 
 class HtmlAuthenticator:
     def __init__(self, credentials: CredentialsProvider, auth_file=AuthenticationStorageConfig.path_name.value) -> None:
@@ -86,9 +92,28 @@ class HtmlVolumeScraper:
     def __init__(self, authenticator: Authenticator) -> None:
         self._authentication_storage_session_path = authenticator.return_authentication_file()
 
-    def return_directions_volumes(self,url:str)->tuple[list[str],list[int]]:
-        directions : list[str] = []
-        volumes : list[int] = []
+    def _parse_volume(self,volume_string:str|None)->int:
+        if volume_string is None:
+            raise Exception("None passed in as volume_string")
+
+        # Expect "<label> : <volume>" structure for volume_string
+        volume_label_value = volume_string.split(":")
+        assert len(volume_label_value) == 2, "Text scraped from Volume Locator doesn't match '<label>: <count>' format."
+        
+        return int(volume_label_value[-1])
+    
+    def _parse_directional_id(self,locator: Locator)->str:
+        direction_id = locator.get_attribute(VolumeScrapingConfig.volume_direction_id_name.value)
+        
+        if direction_id is None:
+            raise Exception(f"{VolumeScrapingConfig.volume_direction_id_name.value} attribute not found")
+        
+        return direction_id
+
+    def return_directions_volumes(self,url:str)->list[tuple[str,DirectionalVolumeAttr]]:
+        direction_volumes : list[tuple[str,DirectionalVolumeAttr]] = []
+        in_volume_mapping : dict[str,int] = {}
+        out_volume_mapping : dict[str,int] = {}
         
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
@@ -96,24 +121,34 @@ class HtmlVolumeScraper:
             page = context.new_page()
             
             page.goto(url)
-            volume_locators = page.locator(VolumeScrapingConfig.volume_locator_text.value).all()
-            for locator in volume_locators:
-                volume_text = locator.text_content()
-                if volume_text is None:
-                    raise Exception(f"Text from locator {VolumeScrapingConfig.volume_locator_text} yielded None")
-                # Text expected in the form "Total : <count>"
-                total_volume_list = volume_text.split(':')
-                assert len(total_volume_list) == 2, "Text scraped from Volume Locator doesn't match 'Total: <count>' format."
-                volumes.append(int(total_volume_list[-1]))
+            
+            in_volume_locators = page.locator(VolumeScrapingConfig.in_volume_locator_text.value).all()
+            out_volume_locators = page.locator(VolumeScrapingConfig.out_volume_locator_text).all()
+            total_volume_locators = page.locator(VolumeScrapingConfig.total_volume_locator_text.value).all()
+            
+            for locator in in_volume_locators:
+                in_volume_mapping[self._parse_directional_id(locator)] = self._parse_volume(locator.text_content())
+            
+            for locator in out_volume_locators:
+                out_volume_mapping[self._parse_directional_id(locator)] = self._parse_volume(locator.text_content())
                 
-                direction_id = locator.get_attribute(VolumeScrapingConfig.volume_direction_id_name.value)
+            
+            for locator in total_volume_locators:
+                total_volume = self._parse_volume(locator.text_content())
+                directional_id = self._parse_directional_id(locator)
+
+                try:
+                    in_volume = in_volume_mapping[directional_id]
+                    out_volume = out_volume_mapping[directional_id]
+                    volume_attr = DirectionalVolumeAttr(total_volume=total_volume,
+                                                        in_volume=in_volume,
+                                                        out_volume=out_volume)
+                    
+                    direction_volumes.append((directional_id,volume_attr))
+                except KeyError as e:
+                    raise KeyError(f"Directional_id for total_volume_locator not found in mapping: {e}")
                 
-                if direction_id is None:
-                    raise Exception(f"{VolumeScrapingConfig.volume_direction_id_name.value} attribute not found")
-                else:
-                    directions.append(direction_id)
-        
-        return (directions,volumes)
+        return direction_volumes
 
 class HtmlVolumeProvider:
     def __init__(self, base_url:str, scraper: VolumeScraper) -> None:
@@ -130,14 +165,18 @@ class HtmlVolumeProvider:
             8 : "Southeastbound"
         }
         
-    def get_volume(self, miovision_id: str)->dict[str,int]:
+    def get_volume(self, miovision_id: str)->dict[str,DirectionalVolumeAttr]:
         directions_volumes = self._scraper.return_directions_volumes(f'{self._base_url}{miovision_id}')
+        volume_mapping  : dict[str, DirectionalVolumeAttr]= {}
         
-        try:
-            return {
-                self._direction_name_mapping[int(direction)] : int(volume) for direction, volume in directions_volumes
-            }
-        except KeyError as e:
-            raise Exception(f'Direction_id returned from VolumeScraper not found in mapping: {e}')
-        except Exception as e:
-            raise Exception(f'Exception raised during volume provider processing: {e}')
+        for direction_id, volume_attributes in directions_volumes:
+            if volume_attributes["in_volume"] != 0:
+                try:
+                    direction_name = self._direction_name_mapping[int(direction_id)]
+                    volume_mapping[direction_name] = volume_attributes
+                except KeyError as e:
+                    raise Exception(f'Direction_id returned from VolumeScraper not found in mapping: {e}')
+                except Exception as e:
+                    raise Exception(f'Exception raised during volume provider processing: {e}')
+        
+        return volume_mapping
