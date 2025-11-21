@@ -5,7 +5,7 @@ from .database_provider import ConnectionStringProvider, DatabaseVolumeProvider,
 from .volume_provider import Authenticator, CredentialsProvider, HtmlAuthenticator, HtmlVolumeProvider, HtmlVolumeScraper, LocalCredentialsProvider, VolumeProvider, VolumeScraper
 
 def excel_files()->list[Path]:
-    test_files_directory = Path('Dummy_Files')
+    test_files_directory = Path('Granular Miovision Files')
     
     assert test_files_directory.exists(), f'Test directory {test_files_directory} does not exist'
     
