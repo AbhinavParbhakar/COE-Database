@@ -10,11 +10,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
       
-      - name: Install Python and requirements
+      - name: Install Python
         uses: actions/setup-python@v6.1.0
         with: 
           python-version: '3.12.10'
           cache: 'pip'
+      
+      - name: Install requirements.txt
         run: pip install -r requirements.txt
       
       - name: Configure Playwright
