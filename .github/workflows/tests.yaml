@@ -17,7 +17,7 @@ jobs:
           cache: 'pip'
       
       - name: Install requirements.txt
-        run: pip install -r requirements.txt
+        run: pip install -r construction_requirements.txt
       
       - name: Configure Playwright
-        run: playwright install  
+        run: playwright install
