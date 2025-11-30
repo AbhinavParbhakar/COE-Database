@@ -27,4 +27,4 @@ jobs:
         run: playwright install
       
       - name: Test Miovision Directional Volume Scraper
-        run: pytest ./database_construction/tests/test_volume_provider
+        run: pytest ./database_construction/tests/test_volume_provider.py
