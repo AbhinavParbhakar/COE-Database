@@ -2,6 +2,10 @@ name: Testing Suite
 
 on: push
 
+env:
+  MIOVISION_PASSWORD: ${{secrets.MIOVISION_PASSWORD}}
+  MIOVISION_USERNAME: ${{secrets.MIOVISION_USERNAME}}
+
 jobs:
   testing_job:
     name: Main Testing job
@@ -21,3 +25,6 @@ jobs:
       
       - name: Configure Playwright
         run: playwright install
+      
+      - name: Test Miovision Directional Volume Scraper
+        run: pytest ./database_construction/tests/test_volume_provider
