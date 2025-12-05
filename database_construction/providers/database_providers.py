@@ -20,6 +20,7 @@ class DatabaseConnection(Protocol):
     
     def is_existing_attr_in_table(self, attr_name: str, attr_value: str, table_name: str)->bool:...
     
+    def are_existing_attributes_in_table(self, attr_labels : list[str], attr_values: list[Any], table_name: str)->bool:...
 
 class PostgresDatabaseConnection:
     def __init__(self,connection_string:str) -> None:
@@ -58,6 +59,23 @@ class PostgresDatabaseConnection:
     def commit(self)->None:
         self.connection.commit()
         return
+    
+    def are_existing_attributes_in_table(self, attr_labels : list[str], attr_values: list[Any], table_name: str)->bool:
+        query = sql.SQL("SELECT * FROM {} WHERE {}").format(
+            sql.Identifier(table_name),
+            sql.SQL(' AND ').join(
+                [sql.SQL("{0} = %s").format(sql.Identifier(label)) for label in attr_labels]
+            )
+        )
+        
+        self.cursor.execute(query,attr_values)
+        
+        results = self.cursor.fetchall()
+        
+        if len(results) > 0:
+            return True
+        else:
+            return False
     
     def is_existing_table(self,table_name:str)->bool:
         required_attribute = "table_name"
@@ -197,13 +215,20 @@ class DatabaseUpdater:
         
     def update_db_and_return_id(self,table_name : str, labels : list[str], values : list[Any])->int|str:
         
-        with self._db_connection as connection:
-            connection.insert_new_information(
-                table_name=table_name,
-                labels=labels,
-                values=values
-            )
+        is_existing_row = self._db_connection.are_existing_attributes_in_table(
+            attr_labels = labels,
+            attr_values = values,
+            table_name = table_name
+        )
         
+        if not is_existing_row:
+            with self._db_connection as connection:
+                connection.insert_new_information(
+                    table_name=table_name,
+                    labels=labels,
+                    values=values
+                )
+            
         query_results = self._db_connection.select_existing_attributes(
             table_name=table_name,
             query_attr=['id'],

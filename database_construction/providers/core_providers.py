@@ -276,28 +276,41 @@ class StudiesProvider:
         with self._db_connection as connection:
             for path in tqdm.tqdm(self._paths):
                 study_fields = self._studies_extractor.extract_fields(path)
-                connection.insert_new_information(
-                    table_name=PredefinedTableNames.studies.value,
-                    labels=[
-                        StudiesTableColumns.miovision_id.value,
-                        StudiesTableColumns.latitude.value,
-                        StudiesTableColumns.longitude.value,
-                        StudiesTableColumns.location_name.value,
-                        StudiesTableColumns.project_name.value,
-                        StudiesTableColumns.study_date.value,
-                        StudiesTableColumns.study_duration.value,
-                        StudiesTableColumns.study_type.value,
-                        StudiesTableColumns.study_name.value
-                    ],
-                    values=[
-                        study_fields.miovision_id,
-                        study_fields.latitude,
-                        study_fields.longitude,
-                        study_fields.location_name,
-                        study_fields.project_name,
-                        study_fields.study_date.date(),
-                        study_fields.study_duration,
-                        study_fields.study_type,
-                        study_fields.study_name
-                    ]
-                )
+                
+                table_name=PredefinedTableNames.studies.value
+                labels = [
+                    StudiesTableColumns.miovision_id.value,
+                    StudiesTableColumns.latitude.value,
+                    StudiesTableColumns.longitude.value,
+                    StudiesTableColumns.location_name.value,
+                    StudiesTableColumns.study_date.value,
+                    StudiesTableColumns.study_duration.value,
+                    StudiesTableColumns.study_type.value,
+                    StudiesTableColumns.study_name.value
+                ]
+                values = [
+                    study_fields.miovision_id,
+                    study_fields.latitude,
+                    study_fields.longitude,
+                    study_fields.location_name,
+                    study_fields.study_date.date(),
+                    study_fields.study_duration,
+                    study_fields.study_type,
+                    study_fields.study_name
+                ]
+                
+                if study_fields.project_name != None:
+                    labels.append(StudiesTableColumns.project_name.value)
+                    values.append(study_fields.project_name)
+                
+                is_existing_row = connection.are_existing_attributes_in_table(attr_labels = labels,
+                                                                              attr_values = values,
+                                                                              table_name = table_name)
+                
+                if not is_existing_row:
+                    connection.insert_new_information(
+                        table_name= table_name,
+                        labels= labels,
+                        values= values
+                    )
+                

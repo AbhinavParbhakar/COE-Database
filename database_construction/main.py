@@ -24,7 +24,8 @@ class ApplicationConfiguration:
     miovision_base_folder_name : str
     vehicle_class_total_volume_sheet_name : str
     validation_extension : str
-    intitialize_setup : bool
+    intitialize_tables : bool
+    intitialize_types : bool
     
 
 class App:
@@ -223,10 +224,11 @@ class App:
         ``None``
         
         """
-        if self.app_configuration.intitialize_setup:
+        if self.app_configuration.intitialize_tables:
             self._initialize_database()
-            self._intitialize_base_providers(self._base_validator)
         
+        if self.app_configuration.intitialize_types:
+            self._intitialize_base_providers(self._base_validator)
         core_providers = self._return_core_providers()
         self._populate_core_tables(core_providers)
         
@@ -235,10 +237,11 @@ if __name__ == "__main__":
     
     app_configuration = ApplicationConfiguration(
                             db_connection_string = get_connection_string('LOCAL_DATABASE_URL'),
-                            miovision_base_folder_name = 'Granular Miovision Files',
+                            miovision_base_folder_name = 'Miovision 2025',
                             vehicle_class_total_volume_sheet_name = 'Total Volume Class Breakdown',
                             validation_extension = '.xlsx',
-                            intitialize_setup = False
+                            intitialize_tables = False,
+                            intitialize_types = False
                         )
     
     application = App(app_configuration=app_configuration)
